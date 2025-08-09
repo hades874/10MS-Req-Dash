@@ -76,11 +76,41 @@ export class GoogleSheetsIntegration {
         } catch (saError: any) {
           // Attach a more helpful message for common 403
           const maybe403 = saError?.code === 403 || saError?.response?.status === 403
-          const helpful = maybe403
-            ? `403 PERMISSION_DENIED: Share the sheet with the service account email ${this.serviceAccountCredentials.client_email} as a reader/editor.`
-            : ""
           console.error("Service account read error:", saError)
-          throw new Error(`Failed to read Google Sheet using service account. ${helpful}`)
+
+          // If we have an API key and hit a 403 with the service account, attempt a public
+          // API key fallback so the app can still function when the sheet is public.
+          if (maybe403 && this.apiKey) {
+            try {
+              console.warn(
+                "403 from service account. Falling back to public API key access (sheet must be public to read).",
+              )
+              const url = `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/${encodeURIComponent(range)}?key=${this.apiKey}`
+              const response = await fetch(url)
+              if (!response.ok) {
+                const errorText = await response.text()
+                console.error("API key fallback failed:", errorText)
+                const helpful =
+                  "403 PERMISSION_DENIED: Share the sheet with the service account email " +
+                  this.serviceAccountCredentials.client_email +
+                  " as a reader/editor, or make the sheet readable by Anyone with the link to use API key."
+                throw new Error(`Failed to read Google Sheet using service account. ${helpful}`)
+              }
+              const data = await response.json()
+              rows = data.values || []
+            } catch (fallbackError) {
+              const helpful =
+                "403 PERMISSION_DENIED: Share the sheet with the service account email " +
+                this.serviceAccountCredentials.client_email +
+                " as a reader/editor, or make the sheet readable by Anyone with the link to use API key."
+              throw new Error(`Failed to read Google Sheet using service account. ${helpful}`)
+            }
+          } else {
+            const helpful = maybe403
+              ? `403 PERMISSION_DENIED: Share the sheet with the service account email ${this.serviceAccountCredentials.client_email} as a reader/editor.`
+              : ""
+            throw new Error(`Failed to read Google Sheet using service account. ${helpful}`)
+          }
         }
       } else {
         // Fallback to public API key access
