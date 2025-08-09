@@ -26,7 +26,7 @@ export class GoogleSheetsIntegration {
   constructor(accessToken?: string) {
     this.accessToken = accessToken || null
     this.apiKey = process.env.GOOGLE_SHEETS_API_KEY || null
-    this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || "1r_my_bbeVOyTwPJWlEmogERw1ZnddKFPLPNhjzlJVXY"
+    this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || ""
 
     // Load service account credentials from environment variable
     if (process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS) {
@@ -48,25 +48,62 @@ export class GoogleSheetsIntegration {
       console.log("Spreadsheet ID:", this.spreadsheetId)
       console.log("API Key present:", !!this.apiKey)
 
-      if (!this.apiKey) {
-        throw new Error("No Google Sheets API key found")
+      if (!this.spreadsheetId) {
+        throw new Error(
+          "Missing GOOGLE_SPREADSHEET_ID. Add it to your environment and restart the dev server.",
+        )
       }
 
-      // Get all data from the sheet (A to CE columns)
+      // Prefer service account if available so private sheets work without being public
+      let rows: string[][] = []
       const range = "A:CE"
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/${encodeURIComponent(range)}?key=${this.apiKey}`
 
-      console.log("Fetching from URL:", url)
-      const response = await fetch(url)
+      if (this.serviceAccountCredentials) {
+        console.log("Using service account to read sheet")
+        try {
+          const auth = new google.auth.JWT({
+            email: this.serviceAccountCredentials.client_email,
+            key: this.serviceAccountCredentials.private_key.replace(/\\n/g, '\n'),
+            scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+          })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("API Error:", errorText)
-        throw new Error(`Google Sheets API error: ${response.status} - ${errorText}`)
+          const sheets = google.sheets({ version: "v4", auth })
+          const resp = await sheets.spreadsheets.values.get({
+            spreadsheetId: this.spreadsheetId,
+            range,
+          })
+          rows = (resp.data.values as string[][]) || []
+        } catch (saError: any) {
+          // Attach a more helpful message for common 403
+          const maybe403 = saError?.code === 403 || saError?.response?.status === 403
+          const helpful = maybe403
+            ? `403 PERMISSION_DENIED: Share the sheet with the service account email ${this.serviceAccountCredentials.client_email} as a reader/editor.`
+            : ""
+          console.error("Service account read error:", saError)
+          throw new Error(`Failed to read Google Sheet using service account. ${helpful}`)
+        }
+      } else {
+        // Fallback to public API key access
+        if (!this.apiKey) {
+          throw new Error(
+            "No Google Sheets API key found and no service account configured. Provide GOOGLE_SERVICE_ACCOUNT_CREDENTIALS or GOOGLE_SHEETS_API_KEY.",
+          )
+        }
+
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${this.spreadsheetId}/values/${encodeURIComponent(range)}?key=${this.apiKey}`
+
+        console.log("Fetching from URL:", url)
+        const response = await fetch(url)
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error("API Error:", errorText)
+          throw new Error(`Google Sheets API error: ${response.status} - ${errorText}`)
+        }
+
+        const data = await response.json()
+        rows = data.values || []
       }
-
-      const data = await response.json()
-      const rows = data.values || []
 
       console.log("Raw data received:")
       console.log("- Total rows:", rows.length)

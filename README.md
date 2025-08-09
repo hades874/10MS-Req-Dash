@@ -51,6 +51,22 @@ MANAGERS_DATA=your_managers_json
 2. Enable Google Sheets API in Google Cloud Console
 3. Create OAuth2 credentials
 4. Add your domain to authorized origins
+5. If your sheet is private, create a Service Account and share the sheet with the service account email as a Reader/Editor
+
+### Private Sheets via Service Account (recommended)
+
+To avoid 403 PERMISSION_DENIED errors when the sheet is not public:
+
+1. In Google Cloud Console, create a Service Account with the Sheets API enabled
+2. Download its JSON credentials
+3. Add an environment variable `GOOGLE_SERVICE_ACCOUNT_CREDENTIALS` containing the entire JSON on a single line. Newlines in `private_key` can remain escaped (\n). Example:
+
+```env
+GOOGLE_SERVICE_ACCOUNT_CREDENTIALS={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"your-sa@project.iam.gserviceaccount.com","client_id":"...","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"..."}
+```
+
+4. Share the Google Sheet with the `client_email` from the JSON. Grant Viewer for read-only, Editor to allow status updates.
+5. Restart the dev server after changing env vars.
 
 ## Deployment
 
