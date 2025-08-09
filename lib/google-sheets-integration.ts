@@ -26,7 +26,7 @@ export class GoogleSheetsIntegration {
   constructor(accessToken?: string) {
     this.accessToken = accessToken || null
     this.apiKey = process.env.GOOGLE_SHEETS_API_KEY || null
-    this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || "1wbuI0ZlGaXgEuUnGi3HVqZ38R8gA9-vnG0UnIqDPu4o"
+    this.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || "1r_my_bbeVOyTwPJWlEmogERw1ZnddKFPLPNhjzlJVXY"
 
     // Load service account credentials from environment variable
     if (process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS) {
