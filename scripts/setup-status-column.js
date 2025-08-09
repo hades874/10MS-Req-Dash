@@ -12,10 +12,10 @@ async function addStatusColumn() {
   const spreadsheetId = "1sxvfRTotejH8teKTOB27Eqqr00YR6LEsr6PBj58Iuns"
 
   try {
-    // Add "Status" header to column CA (column 79)
+    // Add "Status" header to column CE (column 83)
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: "Sheet1!CA1",
+      range: "Sheet1!CE1",
       valueInputOption: "RAW",
       resource: {
         values: [["Status"]],
